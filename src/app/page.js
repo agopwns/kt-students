@@ -4,6 +4,47 @@ import { useState, useEffect, useRef } from 'react';
 import { getAllStudents, upsertStudent, deleteAllStudents, subscribeToStudents } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
+// 교탁 컴포넌트
+function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
+  // 저장 상태 아이콘 컴포넌트
+  const SaveStatus = ({ status }) => {
+    switch (status) {
+      case 'pending':
+        return <span className="text-yellow-500 text-xs">⏳</span>;
+      case 'saving':
+        return <span className="text-blue-500 text-xs animate-spin">⚪</span>;
+      case 'saved':
+        return <span className="text-green-500 text-xs">✅</span>;
+      case 'error':
+        return <span className="text-red-500 text-xs">❌</span>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-xl shadow-lg p-6 border-2 border-emerald-300 hover:shadow-xl hover:scale-105 transition-all duration-300 max-w-xs mx-auto mb-8">
+      <div className="text-center mb-4">
+        <h3 className="text-lg font-bold text-emerald-800 bg-white bg-opacity-60 rounded-full py-2 px-4 inline-block">
+          🧑‍🏫 교탁 (선생님)
+        </h3>
+      </div>
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="선생님 성함"
+          value={teacherName || ''}
+          onChange={(e) => onTeacherChange(e.target.value)}
+          className="w-full px-4 py-4 pr-8 text-base bg-white bg-opacity-80 border border-emerald-400 rounded-lg focus:outline-none focus:ring-3 focus:ring-emerald-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+        />
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+          <SaveStatus status={savingStatus['0-0']} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 개별 테이블 컴포넌트
 function Table({ tableNumber, students, onStudentChange, savingStatus }) {
   // 저장 상태 아이콘 컴포넌트
@@ -60,7 +101,7 @@ function Table({ tableNumber, students, onStudentChange, savingStatus }) {
 }
 
 export default function Home() {
-  // 20개 테이블, 각 테이블당 2명 = 총 40명의 학생 데이터
+  // 교탁 1개 + 학생 테이블 12개 (각 테이블당 2명) = 선생님 1명 + 학생 24명
   const [studentsData, setStudentsData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -165,11 +206,19 @@ export default function Home() {
       setError(null);
 
       // 성공 토스트 표시
-      const studentName = name.trim();
-      if (studentName) {
-        toast.success(`${studentName} 학생 정보가 저장되었습니다! 🎓`);
+      const personName = name.trim();
+      if (personName) {
+        if (tableNumber === 0) {
+          toast.success(`${personName} 선생님 정보가 저장되었습니다! 🧑‍🏫`);
+        } else {
+          toast.success(`${personName} 학생 정보가 저장되었습니다! 🎓`);
+        }
       } else {
-        toast.success('학생 정보가 삭제되었습니다');
+        if (tableNumber === 0) {
+          toast.success('선생님 정보가 삭제되었습니다');
+        } else {
+          toast.success('학생 정보가 삭제되었습니다');
+        }
       }
 
       // 저장 완료 후 500ms 뒤 실시간 업데이트 재활성화 (깜빡임 방지)
@@ -197,6 +246,11 @@ export default function Home() {
       // 에러 시에도 실시간 업데이트 재활성화
       ignoreRealtimeRef.current = false;
     }
+  };
+
+  // 선생님 이름 변경 핸들러 (debounce 적용)
+  const handleTeacherChange = (name) => {
+    handleStudentChange(0, 0, name); // 교탁을 0번 테이블로 처리
   };
 
   // 학생 이름 변경 핸들러 (debounce 적용)
@@ -234,11 +288,11 @@ export default function Home() {
 
   // 데이터 초기화 핸들러
   const handleClearAll = async () => {
-    if (!confirm('모든 학생 정보를 삭제하시겠습니까?')) {
+    if (!confirm('모든 정보를 삭제하시겠습니까? (선생님 + 학생)')) {
       return;
     }
 
-    const toastId = toast.loading('모든 학생 정보를 삭제하는 중...');
+    const toastId = toast.loading('모든 정보를 삭제하는 중... (선생님 + 학생)');
 
     try {
       setLoading(true);
@@ -257,7 +311,7 @@ export default function Home() {
       setError(null);
 
       // 성공 토스트로 업데이트
-      toast.success('모든 학생 정보가 삭제되었습니다! 🗑️', { id: toastId });
+      toast.success('모든 정보가 삭제되었습니다! (선생님 + 학생) 🗑️', { id: toastId });
 
     } catch (err) {
       setError('학생 정보를 삭제하는 중 오류가 발생했습니다.');
@@ -270,13 +324,13 @@ export default function Home() {
     }
   };
 
-  // 5x4 그리드 생성
+  // 3x4 그리드 생성
   const createTables = () => {
     const tables = [];
     let tableNumber = 1;
 
     for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 5; col++) {
+      for (let col = 0; col < 3; col++) {
         const students = studentsData[tableNumber] || {};
         tables.push(
           <Table
@@ -304,7 +358,7 @@ export default function Home() {
               🎓 학생 좌석 배치표
             </h1>
             <p className="text-gray-700 mb-4 text-lg font-medium">
-              총 20개 테이블 × 2명 = 40명의 학생 (Supabase 연동)
+              교탁 1개 + 학생 테이블 12개 × 2명 = 선생님 1명 + 학생 24명 (Supabase 연동)
             </p>
             <div className="text-sm text-gray-600 mb-6 bg-blue-50 rounded-lg p-3">
               <p className="font-medium mb-2">💡 자동 저장 안내:</p>
@@ -345,11 +399,30 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 교탁 */}
+        {loading ? (
+          // 교탁 로딩 스켈레톤
+          <div className="max-w-xs mx-auto mb-8">
+            <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
+              <div className="text-center mb-4">
+                <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
+              </div>
+              <div className="h-12 bg-emerald-300 rounded-lg"></div>
+            </div>
+          </div>
+        ) : (
+          <TeacherDesk
+            teacherName={studentsData[0]?.[0]}
+            onTeacherChange={handleTeacherChange}
+            savingStatus={savingStatus}
+          />
+        )}
+
         {/* 테이블 그리드 */}
-        <div className="grid grid-cols-5 gap-4 max-w-6xl mx-auto">
+        <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto">
           {loading ? (
             // 로딩 스켈레톤
-            Array.from({ length: 20 }, (_, index) => (
+            Array.from({ length: 12 }, (_, index) => (
               <div key={index} className="bg-white bg-opacity-50 rounded-xl p-5 border-2 border-gray-200 animate-pulse">
                 <div className="text-center mb-4">
                   <div className="h-6 bg-gray-300 rounded-full w-20 mx-auto"></div>
@@ -373,11 +446,17 @@ export default function Home() {
               {loading ? (
                 <div className="h-6 bg-emerald-300 rounded w-48 animate-pulse"></div>
               ) : (
-                <p className="text-lg font-bold text-emerald-800">
-                  입력된 학생 수: <span className="text-teal-600">{Object.values(studentsData).reduce((count, table) => {
-                    return count + Object.values(table).filter(name => name && name.trim()).length;
-                  }, 0)}명</span> / <span className="text-emerald-600">40명</span>
-                </p>
+                <div className="text-lg font-bold text-emerald-800">
+                  <p className="mb-1">
+                    👨‍🏫 선생님: <span className="text-emerald-600">{studentsData[0]?.[0] ? '1명' : '0명'}</span> / 1명
+                  </p>
+                  <p>
+                    🎓 학생: <span className="text-teal-600">{Object.entries(studentsData).reduce((count, [tableNum, table]) => {
+                      if (parseInt(tableNum) === 0) return count; // 교탁 제외
+                      return count + Object.values(table).filter(name => name && name.trim()).length;
+                    }, 0)}명</span> / <span className="text-emerald-600">24명</span>
+                  </p>
+                </div>
               )}
             </div>
           </div>
