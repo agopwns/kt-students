@@ -1,9 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { getAllStudents, upsertStudent, deleteAllStudents, subscribeToStudents } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 // 개별 테이블 컴포넌트
-function Table({ tableNumber, students, onStudentChange }) {
+function Table({ tableNumber, students, onStudentChange, savingStatus }) {
+  // 저장 상태 아이콘 컴포넌트
+  const SaveStatus = ({ status }) => {
+    switch (status) {
+      case 'pending':
+        return <span className="text-yellow-500 text-xs">⏳</span>;
+      case 'saving':
+        return <span className="text-blue-500 text-xs animate-spin">⚪</span>;
+      case 'saved':
+        return <span className="text-green-500 text-xs">✅</span>;
+      case 'error':
+        return <span className="text-red-500 text-xs">❌</span>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-lg p-5 border-2 border-blue-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
       <div className="text-center mb-4">
@@ -11,21 +29,31 @@ function Table({ tableNumber, students, onStudentChange }) {
           테이블 {tableNumber}
         </h3>
       </div>
-      <div className="space-y-3">
-        <input
-          type="text"
-          placeholder="학생 1 이름"
-          value={students[0] || ''}
-          onChange={(e) => onStudentChange(tableNumber, 0, e.target.value)}
-          className="w-full px-4 py-3 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium"
-        />
-        <input
-          type="text"
-          placeholder="학생 2 이름"
-          value={students[1] || ''}
-          onChange={(e) => onStudentChange(tableNumber, 1, e.target.value)}
-          className="w-full px-4 py-3 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium"
-        />
+      <div className="flex space-x-2">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="학생 1"
+            value={students[0] || ''}
+            onChange={(e) => onStudentChange(tableNumber, 0, e.target.value)}
+            className="w-full px-3 py-3 pr-7 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+          />
+          <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+            <SaveStatus status={savingStatus[`${tableNumber}-0`]} />
+          </div>
+        </div>
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="학생 2"
+            value={students[1] || ''}
+            onChange={(e) => onStudentChange(tableNumber, 1, e.target.value)}
+            className="w-full px-3 py-3 pr-7 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+          />
+          <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+            <SaveStatus status={savingStatus[`${tableNumber}-1`]} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -34,38 +62,211 @@ function Table({ tableNumber, students, onStudentChange }) {
 export default function Home() {
   // 20개 테이블, 각 테이블당 2명 = 총 40명의 학생 데이터
   const [studentsData, setStudentsData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [savingStatus, setSavingStatus] = useState({}); // 각 필드별 저장 상태
+  const saveTimersRef = useRef({}); // 각 필드별 타이머
+  const ignoreRealtimeRef = useRef(false); // 실시간 업데이트 무시 플래그
 
-  // 컴포넌트 마운트 시 로컬 스토리지에서 데이터 로드
+  // Supabase에서 데이터를 localStorage 형태로 변환하는 함수
+  const transformSupabaseData = (supabaseData) => {
+    const transformed = {};
+    supabaseData?.forEach(student => {
+      if (!transformed[student.table_number]) {
+        transformed[student.table_number] = {};
+      }
+      transformed[student.table_number][student.seat_index] = student.student_name;
+    });
+    return transformed;
+  };
+
+  // 컴포넌트 마운트 시 Supabase에서 데이터 로드
   useEffect(() => {
-    const savedData = localStorage.getItem('studentsSeatingData');
-    if (savedData) {
-      setStudentsData(JSON.parse(savedData));
-    }
+    loadStudentsData(false); // 초기 로드
+
+    // 실시간 구독 설정
+    const subscription = subscribeToStudents((payload) => {
+      console.log('실시간 업데이트:', payload);
+      // 데이터가 변경되면 다시 로드 (실시간 업데이트)
+      loadStudentsData(true);
+    });
+
+    // 컴포넌트 언마운트 시 구독 해제 및 타이머 정리
+    return () => {
+      subscription.unsubscribe();
+
+      // 모든 활성 타이머 정리
+      Object.values(saveTimersRef.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
   }, []);
 
-  // 학생 이름 변경 핸들러
+  // Supabase에서 학생 데이터 로드
+  const loadStudentsData = async (isRealtimeUpdate = false) => {
+    try {
+      // 실시간 업데이트 무시 플래그가 설정되어 있으면 무시
+      if (isRealtimeUpdate && ignoreRealtimeRef.current) {
+        return;
+      }
+
+      // 초기 로드가 아닌 경우 로딩 상태를 표시하지 않음 (깜빡임 방지)
+      if (!isRealtimeUpdate) {
+        setLoading(true);
+      }
+
+      const { data, error } = await getAllStudents();
+
+      if (error) {
+        setError('데이터를 불러오는 중 오류가 발생했습니다.');
+        console.error(error);
+        return;
+      }
+
+      const transformedData = transformSupabaseData(data);
+      setStudentsData(transformedData);
+      setError(null);
+    } catch (err) {
+      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      console.error(err);
+    } finally {
+      if (!isRealtimeUpdate) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // 실제 데이터베이스 저장 함수
+  const saveToDatabase = async (tableNumber, seatIndex, name) => {
+    const fieldKey = `${tableNumber}-${seatIndex}`;
+
+    try {
+      setSavingStatus(prev => ({ ...prev, [fieldKey]: 'saving' }));
+
+      // 저장 시작 시 실시간 업데이트 일시 차단
+      ignoreRealtimeRef.current = true;
+
+      const { error } = await upsertStudent(tableNumber, seatIndex, name.trim());
+
+      if (error) {
+        setSavingStatus(prev => ({ ...prev, [fieldKey]: 'error' }));
+        setError('학생 정보를 저장하는 중 오류가 발생했습니다.');
+        console.error(error);
+
+        // 에러 토스트 표시
+        toast.error('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+
+        // 에러 시에도 실시간 업데이트 재활성화
+        ignoreRealtimeRef.current = false;
+        return;
+      }
+
+      setSavingStatus(prev => ({ ...prev, [fieldKey]: 'saved' }));
+      setError(null);
+
+      // 성공 토스트 표시
+      const studentName = name.trim();
+      if (studentName) {
+        toast.success(`${studentName} 학생 정보가 저장되었습니다! 🎓`);
+      } else {
+        toast.success('학생 정보가 삭제되었습니다');
+      }
+
+      // 저장 완료 후 500ms 뒤 실시간 업데이트 재활성화 (깜빡임 방지)
+      setTimeout(() => {
+        ignoreRealtimeRef.current = false;
+      }, 500);
+
+      // 2초 후 저장 완료 상태 제거
+      setTimeout(() => {
+        setSavingStatus(prev => {
+          const newStatus = { ...prev };
+          delete newStatus[fieldKey];
+          return newStatus;
+        });
+      }, 2000);
+
+    } catch (err) {
+      setSavingStatus(prev => ({ ...prev, [fieldKey]: 'error' }));
+      setError('학생 정보를 저장하는 중 오류가 발생했습니다.');
+      console.error(err);
+
+      // 에러 토스트 표시
+      toast.error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+
+      // 에러 시에도 실시간 업데이트 재활성화
+      ignoreRealtimeRef.current = false;
+    }
+  };
+
+  // 학생 이름 변경 핸들러 (debounce 적용)
   const handleStudentChange = (tableNumber, seatIndex, name) => {
-    setStudentsData(prev => {
-      const newData = {
-        ...prev,
-        [tableNumber]: {
-          ...prev[tableNumber],
-          [seatIndex]: name
-        }
-      };
+    const fieldKey = `${tableNumber}-${seatIndex}`;
 
-      // 로컬 스토리지에 저장
-      localStorage.setItem('studentsSeatingData', JSON.stringify(newData));
+    // 즉시 로컬 상태 업데이트 (UX 향상)
+    setStudentsData(prev => ({
+      ...prev,
+      [tableNumber]: {
+        ...prev[tableNumber],
+        [seatIndex]: name
+      }
+    }));
 
-      return newData;
-    });
+    // 기존 타이머가 있다면 취소
+    if (saveTimersRef.current[fieldKey]) {
+      clearTimeout(saveTimersRef.current[fieldKey]);
+    }
+
+    // 저장 대기 상태로 설정
+    setSavingStatus(prev => ({ ...prev, [fieldKey]: 'pending' }));
+
+    // 2초 후에 데이터베이스에 저장하는 새 타이머 설정
+    const newTimer = setTimeout(() => {
+      saveToDatabase(tableNumber, seatIndex, name);
+
+      // 타이머 정리
+      delete saveTimersRef.current[fieldKey];
+    }, 2000);
+
+    // 새 타이머 저장
+    saveTimersRef.current[fieldKey] = newTimer;
   };
 
   // 데이터 초기화 핸들러
-  const handleClearAll = () => {
-    if (confirm('모든 학생 정보를 삭제하시겠습니까?')) {
+  const handleClearAll = async () => {
+    if (!confirm('모든 학생 정보를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    const toastId = toast.loading('모든 학생 정보를 삭제하는 중...');
+
+    try {
+      setLoading(true);
+      const { error } = await deleteAllStudents();
+
+      if (error) {
+        setError('학생 정보를 삭제하는 중 오류가 발생했습니다.');
+        console.error(error);
+
+        // 에러 토스트로 업데이트
+        toast.error('삭제 중 오류가 발생했습니다. 다시 시도해주세요.', { id: toastId });
+        return;
+      }
+
       setStudentsData({});
-      localStorage.removeItem('studentsSeatingData');
+      setError(null);
+
+      // 성공 토스트로 업데이트
+      toast.success('모든 학생 정보가 삭제되었습니다! 🗑️', { id: toastId });
+
+    } catch (err) {
+      setError('학생 정보를 삭제하는 중 오류가 발생했습니다.');
+      console.error(err);
+
+      // 네트워크 에러 토스트로 업데이트
+      toast.error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.', { id: toastId });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,6 +284,7 @@ export default function Home() {
             tableNumber={tableNumber}
             students={students}
             onStudentChange={handleStudentChange}
+            savingStatus={savingStatus}
           />
         );
         tableNumber++;
@@ -101,21 +303,66 @@ export default function Home() {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
               🎓 학생 좌석 배치표
             </h1>
-            <p className="text-gray-700 mb-6 text-lg font-medium">
-              총 20개 테이블 × 2명 = 40명의 학생
+            <p className="text-gray-700 mb-4 text-lg font-medium">
+              총 20개 테이블 × 2명 = 40명의 학생 (Supabase 연동)
             </p>
+            <div className="text-sm text-gray-600 mb-6 bg-blue-50 rounded-lg p-3">
+              <p className="font-medium mb-2">💡 자동 저장 안내:</p>
+              <div className="flex flex-wrap gap-4 justify-center text-xs">
+                <span>⏳ 저장 대기중</span>
+                <span>⚪ 저장 중...</span>
+                <span>✅ 저장 완료</span>
+                <span>❌ 저장 실패</span>
+              </div>
+              <p className="mt-2 text-xs">
+                타이핑 종료 후 2초 뒤에 자동으로 저장되며,
+                <span className="font-medium text-blue-600"> 저장 완료 시 토스트 알림</span>이 표시됩니다
+              </p>
+            </div>
+
+            {/* 에러 메시지 */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg">
+                ⚠️ {error}
+              </div>
+            )}
+
+            {/* 로딩 상태 */}
+            {loading && (
+              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 text-blue-700 rounded-lg flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700 mr-2"></div>
+                데이터를 불러오는 중...
+              </div>
+            )}
+
             <button
               onClick={handleClearAll}
-              className="px-6 py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg"
+              disabled={loading}
+              className="px-6 py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
             >
-              모든 정보 삭제
+              {loading ? '처리 중...' : '모든 정보 삭제'}
             </button>
           </div>
         </div>
 
         {/* 테이블 그리드 */}
         <div className="grid grid-cols-5 gap-4 max-w-6xl mx-auto">
-          {createTables()}
+          {loading ? (
+            // 로딩 스켈레톤
+            Array.from({ length: 20 }, (_, index) => (
+              <div key={index} className="bg-white bg-opacity-50 rounded-xl p-5 border-2 border-gray-200 animate-pulse">
+                <div className="text-center mb-4">
+                  <div className="h-6 bg-gray-300 rounded-full w-20 mx-auto"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="h-10 bg-gray-300 rounded-lg"></div>
+                  <div className="h-10 bg-gray-300 rounded-lg"></div>
+                </div>
+              </div>
+            ))
+          ) : (
+            createTables()
+          )}
         </div>
 
         {/* 통계 정보 */}
@@ -123,11 +370,15 @@ export default function Home() {
           <div className="inline-block bg-gradient-to-r from-emerald-100 to-teal-100 rounded-2xl shadow-xl p-6 border-2 border-emerald-200">
             <div className="flex items-center justify-center space-x-3">
               <span className="text-2xl">📊</span>
-              <p className="text-lg font-bold text-emerald-800">
-                입력된 학생 수: <span className="text-teal-600">{Object.values(studentsData).reduce((count, table) => {
-                  return count + Object.values(table).filter(name => name && name.trim()).length;
-                }, 0)}명</span> / <span className="text-emerald-600">40명</span>
-              </p>
+              {loading ? (
+                <div className="h-6 bg-emerald-300 rounded w-48 animate-pulse"></div>
+              ) : (
+                <p className="text-lg font-bold text-emerald-800">
+                  입력된 학생 수: <span className="text-teal-600">{Object.values(studentsData).reduce((count, table) => {
+                    return count + Object.values(table).filter(name => name && name.trim()).length;
+                  }, 0)}명</span> / <span className="text-emerald-600">40명</span>
+                </p>
+              )}
             </div>
           </div>
         </div>
