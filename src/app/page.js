@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { getAllStudents, upsertStudent, deleteAllStudents, subscribeToStudents } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
+// Supabase 설정 확인
+const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 // 교탁 컴포넌트
 function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
   // 저장 상태 아이콘 컴포넌트
@@ -121,20 +124,25 @@ export default function Home() {
     return transformed;
   };
 
-  // 컴포넌트 마운트 시 Supabase에서 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadStudentsData(false); // 초기 로드
 
-    // 실시간 구독 설정
-    const subscription = subscribeToStudents((payload) => {
-      console.log('실시간 업데이트:', payload);
-      // 데이터가 변경되면 다시 로드 (실시간 업데이트)
-      loadStudentsData(true);
-    });
+    // Supabase가 설정된 경우에만 실시간 구독 설정
+    let subscription = null;
+    if (isSupabaseConfigured) {
+      subscription = subscribeToStudents((payload) => {
+        console.log('실시간 업데이트:', payload);
+        // 데이터가 변경되면 다시 로드 (실시간 업데이트)
+        loadStudentsData(true);
+      });
+    }
 
     // 컴포넌트 언마운트 시 구독 해제 및 타이머 정리
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
 
       // 모든 활성 타이머 정리
       Object.values(saveTimersRef.current).forEach(timer => {
@@ -143,7 +151,7 @@ export default function Home() {
     };
   }, []);
 
-  // Supabase에서 학생 데이터 로드
+  // 학생 데이터 로드 (Supabase 또는 localStorage)
   const loadStudentsData = async (isRealtimeUpdate = false) => {
     try {
       // 실시간 업데이트 무시 플래그가 설정되어 있으면 무시
@@ -156,17 +164,27 @@ export default function Home() {
         setLoading(true);
       }
 
-      const { data, error } = await getAllStudents();
+      if (isSupabaseConfigured) {
+        // Supabase에서 데이터 로드
+        const { data, error } = await getAllStudents();
 
-      if (error) {
-        setError('데이터를 불러오는 중 오류가 발생했습니다.');
-        console.error(error);
-        return;
+        if (error) {
+          setError('데이터를 불러오는 중 오류가 발생했습니다.');
+          console.error(error);
+          return;
+        }
+
+        const transformedData = transformSupabaseData(data);
+        setStudentsData(transformedData);
+        setError(null);
+      } else {
+        // localStorage에서 데이터 로드
+        const savedData = localStorage.getItem('studentsSeatingData');
+        if (savedData) {
+          setStudentsData(JSON.parse(savedData));
+        }
+        setError(null);
       }
-
-      const transformedData = transformSupabaseData(data);
-      setStudentsData(transformedData);
-      setError(null);
     } catch (err) {
       setError('데이터를 불러오는 중 오류가 발생했습니다.');
       console.error(err);
@@ -177,29 +195,46 @@ export default function Home() {
     }
   };
 
-  // 실제 데이터베이스 저장 함수
+  // 데이터 저장 함수 (Supabase 또는 localStorage)
   const saveToDatabase = async (tableNumber, seatIndex, name) => {
     const fieldKey = `${tableNumber}-${seatIndex}`;
 
     try {
       setSavingStatus(prev => ({ ...prev, [fieldKey]: 'saving' }));
 
-      // 저장 시작 시 실시간 업데이트 일시 차단
-      ignoreRealtimeRef.current = true;
+      if (isSupabaseConfigured) {
+        // Supabase에 저장
+        // 저장 시작 시 실시간 업데이트 일시 차단
+        ignoreRealtimeRef.current = true;
 
-      const { error } = await upsertStudent(tableNumber, seatIndex, name.trim());
+        const { error } = await upsertStudent(tableNumber, seatIndex, name.trim());
 
-      if (error) {
-        setSavingStatus(prev => ({ ...prev, [fieldKey]: 'error' }));
-        setError('학생 정보를 저장하는 중 오류가 발생했습니다.');
-        console.error(error);
+        if (error) {
+          setSavingStatus(prev => ({ ...prev, [fieldKey]: 'error' }));
+          setError('학생 정보를 저장하는 중 오류가 발생했습니다.');
+          console.error(error);
 
-        // 에러 토스트 표시
-        toast.error('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+          // 에러 토스트 표시
+          toast.error('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
 
-        // 에러 시에도 실시간 업데이트 재활성화
-        ignoreRealtimeRef.current = false;
-        return;
+          // 에러 시에도 실시간 업데이트 재활성화
+          ignoreRealtimeRef.current = false;
+          return;
+        }
+
+        // 저장 완료 후 500ms 뒤 실시간 업데이트 재활성화 (깜빡임 방지)
+        setTimeout(() => {
+          ignoreRealtimeRef.current = false;
+        }, 500);
+      } else {
+        // localStorage에 저장
+        const currentData = { ...studentsData };
+        if (!currentData[tableNumber]) {
+          currentData[tableNumber] = {};
+        }
+        currentData[tableNumber][seatIndex] = name;
+
+        localStorage.setItem('studentsSeatingData', JSON.stringify(currentData));
       }
 
       setSavingStatus(prev => ({ ...prev, [fieldKey]: 'saved' }));
@@ -221,11 +256,6 @@ export default function Home() {
         }
       }
 
-      // 저장 완료 후 500ms 뒤 실시간 업데이트 재활성화 (깜빡임 방지)
-      setTimeout(() => {
-        ignoreRealtimeRef.current = false;
-      }, 500);
-
       // 2초 후 저장 완료 상태 제거
       setTimeout(() => {
         setSavingStatus(prev => {
@@ -244,7 +274,9 @@ export default function Home() {
       toast.error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
 
       // 에러 시에도 실시간 업데이트 재활성화
-      ignoreRealtimeRef.current = false;
+      if (isSupabaseConfigured) {
+        ignoreRealtimeRef.current = false;
+      }
     }
   };
 
@@ -296,15 +328,22 @@ export default function Home() {
 
     try {
       setLoading(true);
-      const { error } = await deleteAllStudents();
 
-      if (error) {
-        setError('학생 정보를 삭제하는 중 오류가 발생했습니다.');
-        console.error(error);
+      if (isSupabaseConfigured) {
+        // Supabase에서 삭제
+        const { error } = await deleteAllStudents();
 
-        // 에러 토스트로 업데이트
-        toast.error('삭제 중 오류가 발생했습니다. 다시 시도해주세요.', { id: toastId });
-        return;
+        if (error) {
+          setError('학생 정보를 삭제하는 중 오류가 발생했습니다.');
+          console.error(error);
+
+          // 에러 토스트로 업데이트
+          toast.error('삭제 중 오류가 발생했습니다. 다시 시도해주세요.', { id: toastId });
+          return;
+        }
+      } else {
+        // localStorage에서 삭제
+        localStorage.removeItem('studentsSeatingData');
       }
 
       setStudentsData({});
@@ -358,7 +397,12 @@ export default function Home() {
               🎓 학생 좌석 배치표
             </h1>
             <p className="text-gray-700 mb-4 text-lg font-medium">
-              교탁 1개 + 학생 테이블 12개 × 2명 = 선생님 1명 + 학생 24명 (Supabase 연동)
+              교탁 1개 + 학생 테이블 12개 × 2명 = 선생님 1명 + 학생 24명
+              {isSupabaseConfigured ? (
+                <span className="text-green-600">(Supabase 연동됨)</span>
+              ) : (
+                <span className="text-orange-600">(로컬 모드)</span>
+              )}
             </p>
             <div className="text-sm text-gray-600 mb-6 bg-blue-50 rounded-lg p-3">
               <p className="font-medium mb-2">💡 자동 저장 안내:</p>
@@ -369,10 +413,32 @@ export default function Home() {
                 <span>❌ 저장 실패</span>
               </div>
               <p className="mt-2 text-xs">
-                타이핑 종료 후 2초 뒤에 자동으로 저장되며,
+                타이핑 종료 후 2초 뒤에 자동으로
+                {isSupabaseConfigured ? (
+                  <span className="font-medium text-green-600">데이터베이스에 저장</span>
+                ) : (
+                  <span className="font-medium text-orange-600">브라우저에 저장</span>
+                )}되며,
                 <span className="font-medium text-blue-600"> 저장 완료 시 토스트 알림</span>이 표시됩니다
               </p>
             </div>
+
+            {/* Supabase 설정 경고 */}
+            {!isSupabaseConfigured && (
+              <div className="mb-4 p-4 bg-orange-100 border border-orange-300 text-orange-800 rounded-lg">
+                <div className="flex items-center mb-2">
+                  <span className="text-lg mr-2">⚠️</span>
+                  <span className="font-bold">로컬 모드로 실행 중</span>
+                </div>
+                <p className="text-sm mb-2">
+                  데이터가 브라우저에만 저장되며, 새로고침 시 사라집니다.
+                </p>
+                <p className="text-xs">
+                  Supabase 연동을 위해 환경 변수 <code>NEXT_PUBLIC_SUPABASE_URL</code>과
+                  <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>를 설정해주세요.
+                </p>
+              </div>
+            )}
 
             {/* 에러 메시지 */}
             {error && (
