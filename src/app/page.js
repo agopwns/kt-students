@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getAllStudents, upsertStudent, deleteAllStudents, subscribeToStudents } from '../lib/supabase';
+import { getAllStudents, upsertStudent, deleteAllStudents, subscribeToStudents, getCurrentUser, signOut, onAuthStateChange } from '../lib/supabase';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 // Supabase 설정 확인
@@ -112,6 +113,11 @@ export default function Home() {
   const saveTimersRef = useRef({}); // 각 필드별 타이머
   const ignoreRealtimeRef = useRef(false); // 실시간 업데이트 무시 플래그
 
+  // 인증 관련 상태
+  const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const router = useRouter();
+
   // Supabase에서 데이터를 localStorage 형태로 변환하는 함수
   const transformSupabaseData = (supabaseData) => {
     const transformed = {};
@@ -124,32 +130,35 @@ export default function Home() {
     return transformed;
   };
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (인증 후에만)
   useEffect(() => {
-    loadStudentsData(false); // 초기 로드
+    // 인증이 확인되고 (Supabase가 설정되지 않았거나 로그인된 상태) 학생 데이터를 로드
+    if (!checkingAuth && (!isSupabaseConfigured || user)) {
+      loadStudentsData(false); // 초기 로드
 
-    // Supabase가 설정된 경우에만 실시간 구독 설정
-    let subscription = null;
-    if (isSupabaseConfigured) {
-      subscription = subscribeToStudents((payload) => {
-        console.log('실시간 업데이트:', payload);
-        // 데이터가 변경되면 다시 로드 (실시간 업데이트)
-        loadStudentsData(true);
-      });
-    }
-
-    // 컴포넌트 언마운트 시 구독 해제 및 타이머 정리
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe();
+      // Supabase가 설정된 경우에만 실시간 구독 설정
+      let subscription = null;
+      if (isSupabaseConfigured) {
+        subscription = subscribeToStudents((payload) => {
+          console.log('실시간 업데이트:', payload);
+          // 데이터가 변경되면 다시 로드 (실시간 업데이트)
+          loadStudentsData(true);
+        });
       }
 
-      // 모든 활성 타이머 정리
-      Object.values(saveTimersRef.current).forEach(timer => {
-        if (timer) clearTimeout(timer);
-      });
-    };
-  }, []);
+      // 컴포넌트 언마운트 시 구독 해제 및 타이머 정리
+      return () => {
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+
+        // 모든 활성 타이머 정리
+        Object.values(saveTimersRef.current).forEach(timer => {
+          if (timer) clearTimeout(timer);
+        });
+      };
+    }
+  }, [checkingAuth, user]);
 
   // 학생 데이터 로드 (Supabase 또는 localStorage)
   const loadStudentsData = async (isRealtimeUpdate = false) => {
@@ -387,12 +396,135 @@ export default function Home() {
     return tables;
   };
 
+  // 인증 상태 확인 및 관리
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!isSupabaseConfigured) {
+        // Supabase가 설정되지 않은 경우 로컬 모드로 실행
+        setCheckingAuth(false);
+        return;
+      }
+
+      try {
+        const { data: currentUser, error } = await getCurrentUser();
+        setUser(currentUser);
+
+        if (!currentUser) {
+          // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+          router.push('/login');
+          return;
+        }
+      } catch (error) {
+        console.error('인증 확인 오류:', error);
+        // 세션 관련 오류인 경우 로그인 페이지로 리다이렉트
+        router.push('/login');
+        return;
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+
+    // 인증 상태 변화 구독
+    let authSubscription = null;
+    if (isSupabaseConfigured) {
+      authSubscription = onAuthStateChange((event, session) => {
+        console.log('인증 상태 변화:', event, session);
+
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+          router.push('/login');
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          setUser(session.user);
+        }
+      });
+    }
+
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
+    };
+  }, [router]);
+
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    if (!confirm('로그아웃하시겠습니까?')) {
+      return;
+    }
+
+    const toastId = toast.loading('로그아웃 중...');
+
+    try {
+      const { error } = await signOut();
+
+      if (error) {
+        toast.error('로그아웃에 실패했습니다.', { id: toastId });
+        return;
+      }
+
+      toast.success('로그아웃되었습니다! 👋', { id: toastId });
+      setUser(null);
+      router.push('/login');
+    } catch (error) {
+      console.error('로그아웃 오류:', error);
+      toast.error('네트워크 오류가 발생했습니다.', { id: toastId });
+    }
+  };
+
+  // 인증 확인 중 로딩 화면
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white border-opacity-50">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <span className="text-gray-600">인증 상태 확인 중...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Supabase가 설정되어 있고 로그인되지 않은 경우 (리다이렉트 대기)
+  if (isSupabaseConfigured && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white border-opacity-50">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <span className="text-gray-600">로그인 페이지로 이동 중...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="text-center mb-10">
           <div className="bg-white bg-opacity-70 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white border-opacity-50">
+            {/* 사용자 정보 및 로그아웃 버튼 */}
+            {isSupabaseConfigured && user && (
+              <div className="flex justify-between items-center mb-6">
+                <div className="text-left">
+                  <p className="text-sm text-gray-600">안녕하세요!</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {user.user_metadata?.name || user.email} 님
+                  </p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-lg text-sm font-medium transition-all duration-300 transform hover:scale-105 shadow-md"
+                >
+                  로그아웃
+                </button>
+              </div>
+            )}
+
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
               🎓 학생 좌석 배치표
             </h1>
