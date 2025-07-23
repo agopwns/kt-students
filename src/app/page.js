@@ -27,9 +27,9 @@ function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
   };
 
   return (
-    <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-xl shadow-lg p-6 border-2 border-emerald-300 hover:shadow-xl hover:scale-105 transition-all duration-300 max-w-xs mx-auto mb-8">
-      <div className="text-center mb-4">
-        <h3 className="text-lg font-bold text-emerald-800 bg-white bg-opacity-60 rounded-full py-2 px-4 inline-block">
+    <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-6 border-2 border-emerald-300 hover:shadow-xl hover:scale-105 transition-all duration-300 max-w-xs mx-auto mt-4 sm:mt-8 mb-4 sm:mb-8">
+      <div className="text-center mb-2 sm:mb-4">
+        <h3 className="text-xs sm:text-lg font-bold text-emerald-800 bg-white bg-opacity-60 rounded-full py-1 sm:py-2 px-2 sm:px-4 inline-block">
           🧑‍🏫 교탁 (선생님)
         </h3>
       </div>
@@ -39,7 +39,7 @@ function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
           placeholder="선생님 성함"
           value={teacherName || ''}
           onChange={(e) => onTeacherChange(e.target.value)}
-          className="w-full px-4 py-4 pr-8 text-xl bg-white bg-opacity-80 border border-emerald-400 rounded-lg focus:outline-none focus:ring-3 focus:ring-emerald-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+          className="w-full px-2 sm:px-4 py-2 sm:py-4 pr-6 sm:pr-8 text-sm sm:text-xl bg-white bg-opacity-80 border border-emerald-400 rounded-md sm:rounded-lg focus:outline-none focus:ring-2 sm:focus:ring-3 focus:ring-emerald-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
         />
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
           <SaveStatus status={savingStatus['0-0']} />
@@ -74,22 +74,22 @@ function Table({ tableNumber, students, onStudentChange, savingStatus, isTeacher
   const rightPlaceholder = isTeacherView ? "학생 1" : "학생 2";
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-lg p-5 border-2 border-blue-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
-      <div className="text-center mb-4">
-        <h3 className="text-sm font-bold text-indigo-700 bg-white bg-opacity-60 rounded-full py-1 px-3 inline-block">
-          테이블 {tableNumber}
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-md sm:rounded-xl shadow-md sm:shadow-lg p-1 sm:p-5 border border-blue-200 sm:border-2 hover:shadow-lg sm:hover:shadow-xl hover:scale-102 sm:hover:scale-105 transition-all duration-300">
+      <div className="text-center mb-1 sm:mb-4">
+        <h3 className="text-xs sm:text-sm font-bold text-indigo-700 bg-white bg-opacity-60 rounded-full py-0.5 sm:py-1 px-1 sm:px-3 inline-block">
+          {tableNumber}
         </h3>
       </div>
-      <div className="flex space-x-2">
+      <div className="flex space-x-0.5 sm:space-x-2">
         <div className="relative flex-1">
           <input
             type="text"
             placeholder={leftPlaceholder}
             value={students[leftStudentIndex] || ''}
             onChange={(e) => onStudentChange(tableNumber, leftStudentIndex, e.target.value)}
-            className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+            className="w-full px-1 sm:px-3 py-1.5 sm:py-3 pr-4 sm:pr-7 text-xs sm:text-xl bg-white bg-opacity-80 border border-blue-300 rounded-sm sm:rounded-lg focus:outline-none focus:ring-1 sm:focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
-          <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+          <div className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2">
             <SaveStatus status={savingStatus[`${tableNumber}-${leftStudentIndex}`]} />
           </div>
         </div>
@@ -99,9 +99,9 @@ function Table({ tableNumber, students, onStudentChange, savingStatus, isTeacher
             placeholder={rightPlaceholder}
             value={students[rightStudentIndex] || ''}
             onChange={(e) => onStudentChange(tableNumber, rightStudentIndex, e.target.value)}
-            className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+            className="w-full px-1 sm:px-3 py-1.5 sm:py-3 pr-4 sm:pr-7 text-xs sm:text-xl bg-white bg-opacity-80 border border-blue-300 rounded-sm sm:rounded-lg focus:outline-none focus:ring-1 sm:focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
-          <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+          <div className="absolute right-0.5 sm:right-1 top-1/2 transform -translate-y-1/2">
             <SaveStatus status={savingStatus[`${tableNumber}-${rightStudentIndex}`]} />
           </div>
         </div>
@@ -381,47 +381,39 @@ export default function Home() {
     }
   };
 
-  // 3x4 그리드 생성
+  // 3x4 그리드 생성 (모바일도 3열로 컴팩트하게)
   const createTables = () => {
     const tables = [];
 
-    // 교탁 시점인 경우 테이블 순서를 반전 (뒤에서부터 앞으로, 오른쪽에서 왼쪽으로)
     if (isTeacherView) {
-      // 교탁 시점: 12 11 10, 9 8 7, 6 5 4, 3 2 1 순서
-      for (let row = 3; row >= 0; row--) {
-        for (let col = 2; col >= 0; col--) {
-          const tableNumber = row * 3 + col + 1;
-          const students = studentsData[tableNumber] || {};
-          tables.push(
-            <Table
-              key={tableNumber}
-              tableNumber={tableNumber}
-              students={students}
-              onStudentChange={handleStudentChange}
-              savingStatus={savingStatus}
-              isTeacherView={isTeacherView}
-            />
-          );
-        }
+      // 교탁 시점: 12 11 10, 9 8 7, 6 5 4, 3 2 1 순서 (역순)
+      for (let i = 12; i >= 1; i--) {
+        const students = studentsData[i] || {};
+        tables.push(
+          <Table
+            key={i}
+            tableNumber={i}
+            students={students}
+            onStudentChange={handleStudentChange}
+            savingStatus={savingStatus}
+            isTeacherView={isTeacherView}
+          />
+        );
       }
     } else {
-      // 학생 시점: 1 2 3, 4 5 6, 7 8 9, 10 11 12 순서 (기본)
-      let tableNumber = 1;
-      for (let row = 0; row < 4; row++) {
-        for (let col = 0; col < 3; col++) {
-          const students = studentsData[tableNumber] || {};
-          tables.push(
-            <Table
-              key={tableNumber}
-              tableNumber={tableNumber}
-              students={students}
-              onStudentChange={handleStudentChange}
-              savingStatus={savingStatus}
-              isTeacherView={isTeacherView}
-            />
-          );
-          tableNumber++;
-        }
+      // 학생 시점: 1 2 3, 4 5 6, 7 8 9, 10 11 12 순서 (정순)
+      for (let i = 1; i <= 12; i++) {
+        const students = studentsData[i] || {};
+        tables.push(
+          <Table
+            key={i}
+            tableNumber={i}
+            students={students}
+            onStudentChange={handleStudentChange}
+            savingStatus={savingStatus}
+            isTeacherView={isTeacherView}
+          />
+        );
       }
     }
 
@@ -568,31 +560,33 @@ export default function Home() {
               </div>
             )}
 
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
+            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
               🎓 학생 좌석 배치표
             </h1>
-            <p className="text-gray-700 mb-4 text-lg font-medium">
-              교탁 1개 + 학생 테이블 12개 × 2명 = 선생님 1명 + 학생 24명
+            <p className="text-gray-700 mb-4 text-sm sm:text-lg font-medium">
+              교탁 1개 + 학생 테이블 12개 × 2명<br className="sm:hidden" />
+              <span className="sm:inline"> = 선생님 1명 + 학생 24명</span>
+              <br className="sm:hidden" />
               {isSupabaseConfigured ? (
                 <span className="text-green-600">(Supabase 연동됨)</span>
               ) : (
                 <span className="text-orange-600">(로컬 모드)</span>
               )}
             </p>
-            <div className="text-sm text-gray-600 mb-6 bg-blue-50 rounded-lg p-3">
+            <div className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6 bg-blue-50 rounded-lg p-3 mx-4 sm:mx-0">
               <p className="font-medium mb-2">💡 자동 저장 안내:</p>
-              <div className="flex flex-wrap gap-4 justify-center text-xs">
+              <div className="flex flex-wrap gap-2 sm:gap-4 justify-center text-xs">
                 <span>⏳ 저장 대기중</span>
                 <span>⚪ 저장 중...</span>
                 <span>✅ 저장 완료</span>
                 <span>❌ 저장 실패</span>
               </div>
-              <p className="mt-2 text-xs">
+              <p className="mt-2 text-xs leading-relaxed">
                 타이핑 종료 후 2초 뒤에 자동으로
                 {isSupabaseConfigured ? (
-                  <span className="font-medium text-green-600">데이터베이스에 저장</span>
+                  <span className="font-medium text-green-600"> 데이터베이스에 저장</span>
                 ) : (
-                  <span className="font-medium text-orange-600">브라우저에 저장</span>
+                  <span className="font-medium text-orange-600"> 브라우저에 저장</span>
                 )}되며,
                 <span className="font-medium text-blue-600"> 저장 완료 시 토스트 알림</span>이 표시됩니다
               </p>
@@ -630,12 +624,12 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-4 justify-center items-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4 sm:px-0">
               {/* 뷰 모드 전환 버튼 */}
               <button
                 onClick={toggleViewMode}
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
               >
                 {isTeacherView ? (
                   <>🏃‍♂️ 학생 시점으로 보기</>
@@ -648,7 +642,7 @@ export default function Home() {
               <button
                 onClick={handleClearAll}
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
               >
                 {loading ? '처리 중...' : '모든 정보 삭제'}
               </button>
@@ -657,13 +651,13 @@ export default function Home() {
         </div>
 
         {/* 현재 뷰 모드 안내 */}
-        <div className="text-center mb-6">
-          <div className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl px-6 py-3 border border-blue-200 shadow-sm">
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg sm:rounded-xl px-4 sm:px-6 py-2 sm:py-3 border border-blue-200 shadow-sm">
             <div className="flex items-center justify-center space-x-2">
-              <span className="text-lg">
+              <span className="text-base sm:text-lg">
                 {isTeacherView ? '🧑‍🏫' : '🏃‍♂️'}
               </span>
-              <span className="text-sm font-medium text-blue-800">
+              <span className="text-xs sm:text-sm font-medium text-blue-800">
                 현재 시점: {isTeacherView ? '교탁에서 바라보는 시각' : '학생 시각'}
               </span>
             </div>
@@ -676,12 +670,12 @@ export default function Home() {
           {!isTeacherView && (
             loading ? (
               // 교탁 로딩 스켈레톤
-              <div className="max-w-xs mx-auto mb-8">
-                <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
-                  <div className="text-center mb-4">
-                    <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
+              <div className="max-w-xs mx-auto mb-4 sm:mb-8">
+                <div className="bg-emerald-100 bg-opacity-50 rounded-lg sm:rounded-xl p-3 sm:p-6 border-2 border-emerald-200 animate-pulse">
+                  <div className="text-center mb-2 sm:mb-4">
+                    <div className="h-4 sm:h-8 bg-emerald-300 rounded-full w-24 sm:w-32 mx-auto"></div>
                   </div>
-                  <div className="h-12 bg-emerald-300 rounded-lg"></div>
+                  <div className="h-8 sm:h-12 bg-emerald-300 rounded-md sm:rounded-lg"></div>
                 </div>
               </div>
             ) : (
@@ -693,18 +687,18 @@ export default function Home() {
             )
           )}
 
-          {/* 테이블 그리드 */}
-          <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto">
+          {/* 테이블 그리드 - 모바일도 3열로 컴팩트하게 */}
+          <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-full sm:max-w-4xl mx-auto px-1 sm:px-0">
             {loading ? (
               // 로딩 스켈레톤
               Array.from({ length: 12 }, (_, index) => (
-                <div key={index} className="bg-white bg-opacity-50 rounded-xl p-5 border-2 border-gray-200 animate-pulse">
-                  <div className="text-center mb-4">
-                    <div className="h-6 bg-gray-300 rounded-full w-20 mx-auto"></div>
+                <div key={index} className="bg-white bg-opacity-50 rounded-md sm:rounded-xl p-1 sm:p-5 border border-gray-200 sm:border-2 animate-pulse">
+                  <div className="text-center mb-1 sm:mb-4">
+                    <div className="h-3 sm:h-6 bg-gray-300 rounded-full w-8 sm:w-20 mx-auto"></div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="h-10 bg-gray-300 rounded-lg"></div>
-                    <div className="h-10 bg-gray-300 rounded-lg"></div>
+                  <div className="space-y-1 sm:space-y-3">
+                    <div className="h-6 sm:h-10 bg-gray-300 rounded-sm sm:rounded-lg"></div>
+                    <div className="h-6 sm:h-10 bg-gray-300 rounded-sm sm:rounded-lg"></div>
                   </div>
                 </div>
               ))
@@ -717,12 +711,12 @@ export default function Home() {
           {isTeacherView && (
             loading ? (
               // 교탁 로딩 스켈레톤
-              <div className="max-w-xs mx-auto mt-8">
-                <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
-                  <div className="text-center mb-4">
-                    <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
+              <div className="max-w-xs mx-auto mt-4 sm:mt-8">
+                <div className="bg-emerald-100 bg-opacity-50 rounded-lg sm:rounded-xl p-3 sm:p-6 border-2 border-emerald-200 animate-pulse">
+                  <div className="text-center mb-2 sm:mb-4">
+                    <div className="h-4 sm:h-8 bg-emerald-300 rounded-full w-24 sm:w-32 mx-auto"></div>
                   </div>
-                  <div className="h-12 bg-emerald-300 rounded-lg"></div>
+                  <div className="h-8 sm:h-12 bg-emerald-300 rounded-md sm:rounded-lg"></div>
                 </div>
               </div>
             ) : (
@@ -736,14 +730,14 @@ export default function Home() {
         </div>
 
         {/* 통계 정보 */}
-        <div className="mt-10 text-center">
-          <div className="inline-block bg-gradient-to-r from-emerald-100 to-teal-100 rounded-2xl shadow-xl p-6 border-2 border-emerald-200">
-            <div className="flex items-center justify-center space-x-3">
-              <span className="text-2xl">📊</span>
+        <div className="mt-8 sm:mt-10 text-center px-4 sm:px-0">
+          <div className="inline-block bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 border-2 border-emerald-200">
+            <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+              <span className="text-xl sm:text-2xl">📊</span>
               {loading ? (
-                <div className="h-6 bg-emerald-300 rounded w-48 animate-pulse"></div>
+                <div className="h-4 sm:h-6 bg-emerald-300 rounded w-32 sm:w-48 animate-pulse"></div>
               ) : (
-                <div className="text-lg font-bold text-emerald-800">
+                <div className="text-sm sm:text-lg font-bold text-emerald-800">
                   <p className="mb-1">
                     👨‍🏫 선생님: <span className="text-emerald-600">{studentsData[0]?.[0] ? '1명' : '0명'}</span> / 1명
                   </p>
