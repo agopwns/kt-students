@@ -35,7 +35,7 @@ function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
           placeholder="선생님 성함"
           value={teacherName || ''}
           onChange={(e) => onTeacherChange(e.target.value)}
-          className="w-full px-4 py-4 pr-8 text-base bg-white bg-opacity-80 border border-emerald-400 rounded-lg focus:outline-none focus:ring-3 focus:ring-emerald-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+          className="w-full px-4 py-4 pr-8 text-xl bg-white bg-opacity-80 border border-emerald-400 rounded-lg focus:outline-none focus:ring-3 focus:ring-emerald-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
         />
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
           <SaveStatus status={savingStatus['0-0']} />
@@ -77,7 +77,7 @@ function Table({ tableNumber, students, onStudentChange, savingStatus }) {
             placeholder="학생 1"
             value={students[0] || ''}
             onChange={(e) => onStudentChange(tableNumber, 0, e.target.value)}
-            className="w-full px-3 py-3 pr-7 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+            className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
           <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
             <SaveStatus status={savingStatus[`${tableNumber}-0`]} />
@@ -89,7 +89,7 @@ function Table({ tableNumber, students, onStudentChange, savingStatus }) {
             placeholder="학생 2"
             value={students[1] || ''}
             onChange={(e) => onStudentChange(tableNumber, 1, e.target.value)}
-            className="w-full px-3 py-3 pr-7 text-sm bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
+            className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
           <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
             <SaveStatus status={savingStatus[`${tableNumber}-1`]} />
