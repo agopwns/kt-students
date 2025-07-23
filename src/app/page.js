@@ -50,7 +50,7 @@ function TeacherDesk({ teacherName, onTeacherChange, savingStatus }) {
 }
 
 // 개별 테이블 컴포넌트
-function Table({ tableNumber, students, onStudentChange, savingStatus }) {
+function Table({ tableNumber, students, onStudentChange, savingStatus, isTeacherView = false }) {
   // 저장 상태 아이콘 컴포넌트
   const SaveStatus = ({ status }) => {
     switch (status) {
@@ -67,6 +67,12 @@ function Table({ tableNumber, students, onStudentChange, savingStatus }) {
     }
   };
 
+  // 교탁 시점에서는 학생 좌우 위치를 바꿈
+  const leftStudentIndex = isTeacherView ? 1 : 0;
+  const rightStudentIndex = isTeacherView ? 0 : 1;
+  const leftPlaceholder = isTeacherView ? "학생 2" : "학생 1";
+  const rightPlaceholder = isTeacherView ? "학생 1" : "학생 2";
+
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl shadow-lg p-5 border-2 border-blue-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
       <div className="text-center mb-4">
@@ -78,25 +84,25 @@ function Table({ tableNumber, students, onStudentChange, savingStatus }) {
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="학생 1"
-            value={students[0] || ''}
-            onChange={(e) => onStudentChange(tableNumber, 0, e.target.value)}
+            placeholder={leftPlaceholder}
+            value={students[leftStudentIndex] || ''}
+            onChange={(e) => onStudentChange(tableNumber, leftStudentIndex, e.target.value)}
             className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
           <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-            <SaveStatus status={savingStatus[`${tableNumber}-0`]} />
+            <SaveStatus status={savingStatus[`${tableNumber}-${leftStudentIndex}`]} />
           </div>
         </div>
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="학생 2"
-            value={students[1] || ''}
-            onChange={(e) => onStudentChange(tableNumber, 1, e.target.value)}
+            placeholder={rightPlaceholder}
+            value={students[rightStudentIndex] || ''}
+            onChange={(e) => onStudentChange(tableNumber, rightStudentIndex, e.target.value)}
             className="w-full px-3 py-3 pr-7 text-xl bg-white bg-opacity-80 border border-blue-300 rounded-lg focus:outline-none focus:ring-3 focus:ring-blue-300 focus:bg-white transition-all placeholder-gray-500 text-gray-800 font-medium text-center"
           />
           <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-            <SaveStatus status={savingStatus[`${tableNumber}-1`]} />
+            <SaveStatus status={savingStatus[`${tableNumber}-${rightStudentIndex}`]} />
           </div>
         </div>
       </div>
@@ -117,6 +123,9 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+
+  // 뷰 모드 상태 (false: 학생 시점, true: 교탁 시점)
+  const [isTeacherView, setIsTeacherView] = useState(false);
 
   // Supabase에서 데이터를 localStorage 형태로 변환하는 함수
   const transformSupabaseData = (supabaseData) => {
@@ -375,21 +384,44 @@ export default function Home() {
   // 3x4 그리드 생성
   const createTables = () => {
     const tables = [];
-    let tableNumber = 1;
 
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 3; col++) {
-        const students = studentsData[tableNumber] || {};
-        tables.push(
-          <Table
-            key={tableNumber}
-            tableNumber={tableNumber}
-            students={students}
-            onStudentChange={handleStudentChange}
-            savingStatus={savingStatus}
-          />
-        );
-        tableNumber++;
+    // 교탁 시점인 경우 테이블 순서를 반전 (뒤에서부터 앞으로, 오른쪽에서 왼쪽으로)
+    if (isTeacherView) {
+      // 교탁 시점: 12 11 10, 9 8 7, 6 5 4, 3 2 1 순서
+      for (let row = 3; row >= 0; row--) {
+        for (let col = 2; col >= 0; col--) {
+          const tableNumber = row * 3 + col + 1;
+          const students = studentsData[tableNumber] || {};
+          tables.push(
+            <Table
+              key={tableNumber}
+              tableNumber={tableNumber}
+              students={students}
+              onStudentChange={handleStudentChange}
+              savingStatus={savingStatus}
+              isTeacherView={isTeacherView}
+            />
+          );
+        }
+      }
+    } else {
+      // 학생 시점: 1 2 3, 4 5 6, 7 8 9, 10 11 12 순서 (기본)
+      let tableNumber = 1;
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 3; col++) {
+          const students = studentsData[tableNumber] || {};
+          tables.push(
+            <Table
+              key={tableNumber}
+              tableNumber={tableNumber}
+              students={students}
+              onStudentChange={handleStudentChange}
+              savingStatus={savingStatus}
+              isTeacherView={isTeacherView}
+            />
+          );
+          tableNumber++;
+        }
       }
     }
 
@@ -471,6 +503,17 @@ export default function Home() {
       console.error('로그아웃 오류:', error);
       toast.error('네트워크 오류가 발생했습니다.', { id: toastId });
     }
+  };
+
+  // 뷰 모드 전환 핸들러
+  const toggleViewMode = () => {
+    setIsTeacherView(prev => !prev);
+    toast.success(
+      isTeacherView
+        ? '학생 시점으로 전환되었습니다! 👥'
+        : '교탁 시점으로 전환되었습니다! 🧑‍🏫',
+      { duration: 2000 }
+    );
   };
 
   // 인증 확인 중 로딩 화면
@@ -587,52 +630,108 @@ export default function Home() {
               </div>
             )}
 
-            <button
-              onClick={handleClearAll}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
-            >
-              {loading ? '처리 중...' : '모든 정보 삭제'}
-            </button>
+            <div className="flex flex-wrap gap-4 justify-center items-center">
+              {/* 뷰 모드 전환 버튼 */}
+              <button
+                onClick={toggleViewMode}
+                disabled={loading}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
+              >
+                {isTeacherView ? (
+                  <>🏃‍♂️ 학생 시점으로 보기</>
+                ) : (
+                  <>🧑‍🏫 교탁 시점으로 보기</>
+                )}
+              </button>
+
+              {/* 삭제 버튼 */}
+              <button
+                onClick={handleClearAll}
+                disabled={loading}
+                className="px-6 py-3 bg-gradient-to-r from-pink-400 to-red-500 hover:from-pink-500 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg disabled:hover:scale-100"
+              >
+                {loading ? '처리 중...' : '모든 정보 삭제'}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* 교탁 */}
-        {loading ? (
-          // 교탁 로딩 스켈레톤
-          <div className="max-w-xs mx-auto mb-8">
-            <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
-              <div className="text-center mb-4">
-                <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
-              </div>
-              <div className="h-12 bg-emerald-300 rounded-lg"></div>
+        {/* 현재 뷰 모드 안내 */}
+        <div className="text-center mb-6">
+          <div className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl px-6 py-3 border border-blue-200 shadow-sm">
+            <div className="flex items-center justify-center space-x-2">
+              <span className="text-lg">
+                {isTeacherView ? '🧑‍🏫' : '🏃‍♂️'}
+              </span>
+              <span className="text-sm font-medium text-blue-800">
+                현재 시점: {isTeacherView ? '교탁에서 바라보는 시각' : '학생 시각'}
+              </span>
             </div>
           </div>
-        ) : (
-          <TeacherDesk
-            teacherName={studentsData[0]?.[0]}
-            onTeacherChange={handleTeacherChange}
-            savingStatus={savingStatus}
-          />
-        )}
+        </div>
 
-        {/* 테이블 그리드 */}
-        <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto">
-          {loading ? (
-            // 로딩 스켈레톤
-            Array.from({ length: 12 }, (_, index) => (
-              <div key={index} className="bg-white bg-opacity-50 rounded-xl p-5 border-2 border-gray-200 animate-pulse">
-                <div className="text-center mb-4">
-                  <div className="h-6 bg-gray-300 rounded-full w-20 mx-auto"></div>
-                </div>
-                <div className="space-y-3">
-                  <div className="h-10 bg-gray-300 rounded-lg"></div>
-                  <div className="h-10 bg-gray-300 rounded-lg"></div>
+        {/* 좌석 배치 컨테이너 */}
+        <div className="transition-all duration-500 ease-in-out">
+          {/* 교탁 - 교탁 시점에서는 아래쪽에 위치 */}
+          {!isTeacherView && (
+            loading ? (
+              // 교탁 로딩 스켈레톤
+              <div className="max-w-xs mx-auto mb-8">
+                <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
+                  <div className="text-center mb-4">
+                    <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
+                  </div>
+                  <div className="h-12 bg-emerald-300 rounded-lg"></div>
                 </div>
               </div>
-            ))
-          ) : (
-            createTables()
+            ) : (
+              <TeacherDesk
+                teacherName={studentsData[0]?.[0]}
+                onTeacherChange={handleTeacherChange}
+                savingStatus={savingStatus}
+              />
+            )
+          )}
+
+          {/* 테이블 그리드 */}
+          <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {loading ? (
+              // 로딩 스켈레톤
+              Array.from({ length: 12 }, (_, index) => (
+                <div key={index} className="bg-white bg-opacity-50 rounded-xl p-5 border-2 border-gray-200 animate-pulse">
+                  <div className="text-center mb-4">
+                    <div className="h-6 bg-gray-300 rounded-full w-20 mx-auto"></div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-10 bg-gray-300 rounded-lg"></div>
+                    <div className="h-10 bg-gray-300 rounded-lg"></div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              createTables()
+            )}
+          </div>
+
+          {/* 교탁 - 교탁 시점에서는 위쪽에 위치 */}
+          {isTeacherView && (
+            loading ? (
+              // 교탁 로딩 스켈레톤
+              <div className="max-w-xs mx-auto mt-8">
+                <div className="bg-emerald-100 bg-opacity-50 rounded-xl p-6 border-2 border-emerald-200 animate-pulse">
+                  <div className="text-center mb-4">
+                    <div className="h-8 bg-emerald-300 rounded-full w-32 mx-auto"></div>
+                  </div>
+                  <div className="h-12 bg-emerald-300 rounded-lg"></div>
+                </div>
+              </div>
+            ) : (
+              <TeacherDesk
+                teacherName={studentsData[0]?.[0]}
+                onTeacherChange={handleTeacherChange}
+                savingStatus={savingStatus}
+              />
+            )
           )}
         </div>
 
